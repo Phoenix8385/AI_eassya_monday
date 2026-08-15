@@ -95,10 +95,34 @@ class SentenceInsight(BaseModel):
         "e.g. 'resembles human-written examples'. Always present, so a "
         "per-sentence score is never displayed as a bare number.",
     )
-    flagged: bool
-    reasons: list[str] = Field(
-        default_factory=list,
-        description="Human-readable evidence, empty when nothing stood out.",
+    flagged: bool = Field(
+        ...,
+        description="True when this sentence stands out from the rest of THIS "
+        "essay, in a direction associated with AI writing, by more than the "
+        "configured threshold.",
+    )
+    reason: str | None = Field(
+        default=None,
+        description="One templated sentence naming the dominant signal, or "
+        "null when nothing cleared the minimum z-score. Never a bare number, "
+        "and never a template fired on a weak signal.",
+    )
+    local_score: float | None = Field(
+        default=None,
+        description="Coefficient-weighted deviation of this sentence from its "
+        "OWN essay's norm, on a z-scale. Null when the essay has too few "
+        "sentences to compute a trustworthy variance.",
+    )
+    ppl_z: float | None = Field(
+        default=None,
+        description="Within-essay z-score of this sentence's perplexity. "
+        "Negative means more predictable than the essay's own norm. Null when "
+        "localization was skipped.",
+    )
+    length_z: float | None = Field(
+        default=None,
+        description="Within-essay z-score of this sentence's word count. Null "
+        "when localization was skipped.",
     )
 
 

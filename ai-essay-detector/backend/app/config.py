@@ -72,14 +72,60 @@ class Settings(BaseSettings):
 
     # --- Analysis ---------------------------------------------------------
     min_essay_chars: int = Field(
-        default=200,
+        default=250,
         ge=1,
-        description="Minimum accepted essay length; also the schema constraint.",
+        description="Pydantic-level minimum, a cheap proxy for MIN_ESSAY_WORDS "
+        "(~250 chars ~ 50 words). Counting words is the handler's job; this "
+        "just rejects the obviously-too-short before any work is done.",
     )
     max_essay_chars: int = Field(
-        default=25_000,
+        default=150_000,
         ge=1,
-        description="Maximum accepted essay length.",
+        description="Pydantic-level ceiling. Deliberately loose enough that "
+        "MAX_ESSAY_WORDS is the binding limit rather than dead code; it exists "
+        "to bound the request body before the string is measured.",
+    )
+    min_essay_words: int = Field(
+        default=50,
+        ge=1,
+        description="Real minimum, enforced in the handler. Below this the "
+        "sentence-level statistics have too few sentences to mean anything.",
+    )
+    max_essay_words: int = Field(
+        default=20_000,
+        ge=1,
+        description="Upper bound, enforced in the handler. GPT-2 scoring is "
+        "linear in length, so an unbounded essay is an unbounded request. Well "
+        "above any real admissions essay (~650 words); lower it on modest "
+        "hardware, where even a few thousand words is a slow request.",
+    )
+
+    # --- Rate limiting ----------------------------------------------------
+    rate_limit_enabled: bool = Field(
+        default=True,
+        description="Per-client request limiting on /analyze.",
+    )
+    rate_limit_requests: int = Field(
+        default=10,
+        ge=1,
+        description="Requests allowed per client per window.",
+    )
+    rate_limit_window_seconds: float = Field(
+        default=60.0,
+        gt=0.0,
+        description="Length of the sliding window, in seconds.",
+    )
+    rate_limit_max_tracked_clients: int = Field(
+        default=10_000,
+        ge=1,
+        description="Cap on tracked clients, so the in-memory limiter cannot "
+        "itself become a memory leak under a spray of unique addresses.",
+    )
+    trust_forwarded_for: bool = Field(
+        default=False,
+        description="Read the client IP from X-Forwarded-For. Leave false "
+        "unless a trusted proxy sets that header -- otherwise any caller can "
+        "spoof it and bypass the rate limit entirely.",
     )
     perplexity_window_tokens: int = Field(
         default=1024,
@@ -103,6 +149,28 @@ class Settings(BaseSettings):
         default=1.4,
         gt=0.0,
         description="Steepness of the sentence-likelihood sigmoid.",
+    )
+    min_sentences_for_localization: int = Field(
+        default=4,
+        ge=2,
+        description="Below this many scoreable sentences, the essay's own "
+        "variance is too noisy to z-score against. Sentence scores come back "
+        "null rather than misleading.",
+    )
+    sentence_flag_z: float = Field(
+        default=1.5,
+        gt=0.0,
+        description="Coefficient-weighted within-essay deviation at which a "
+        "sentence is flagged. Absolute, not a percentile: a uniform essay can "
+        "flag nothing, which a top-N%% rule could never report. Justified in "
+        "EVALUATION.md.",
+    )
+    sentence_min_z: float = Field(
+        default=1.0,
+        ge=0.0,
+        description="Floor on the dominant signal's raw z-score before any "
+        "reason template may fire. Stops a weak signal being dressed up in a "
+        "confident-sounding sentence.",
     )
     sentence_flag_threshold: float = Field(
         default=0.65,

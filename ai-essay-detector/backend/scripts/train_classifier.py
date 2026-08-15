@@ -1,8 +1,8 @@
 """Train the essay classifier and write the .joblib the API loads.
 
-    python -m scripts.train                      # all CSVs in app/data
-    python -m scripts.train --data mydata.csv    # a specific dataset
-    python -m scripts.train --refresh-cache      # force re-extraction
+    python -m scripts.train_classifier                      # all CSVs in app/data
+    python -m scripts.train_classifier --data mydata.csv    # a specific dataset
+    python -m scripts.train_classifier --refresh-cache      # force re-extraction
 
 Input CSVs need a text column and a binary label column (default ``text`` and
 ``label``; 1 = AI-generated, 0 = human). Every essay is scored through the same
@@ -15,8 +15,17 @@ load it and go straight to training, so tuning the classifier costs seconds
 instead of another full GPT-2 pass. The cache is keyed to the current
 ``FEATURE_NAMES``; if those change it is rejected rather than silently reused.
 
-The artifact is a dict, not a bare estimator: it carries the feature order and
-the sentence-level calibration stats that ``services.classifier`` needs.
+**Logistic regression on purpose, not for lack of ambition.** A gradient-boosted
+ensemble would likely score a point or two higher and would make the per-feature
+explanations in the API a post-hoc reconstruction rather than the model's actual
+reasoning. Here the standardised coefficients *are* the explanation: the weights
+printed at the end of training are the same numbers `services.classifier` uses
+to attribute each essay's score to individual signals. That is what keeps the
+explainability honest.
+
+The artifact is a dict, not a bare estimator: it carries the feature order, the
+fitted weights, and the sentence-level calibration stats that
+``services.classifier`` needs.
 """
 
 from __future__ import annotations
@@ -32,7 +41,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 from sklearn.model_selection import (
     StratifiedKFold,
     cross_val_predict,
@@ -43,7 +52,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
-# Allow `python scripts/train.py` as well as `python -m scripts.train`.
+# Allow `python scripts/train_classifier.py` as well as `python -m scripts.train_classifier`.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import BACKEND_ROOT, get_settings  # noqa: E402
@@ -63,6 +72,14 @@ DEFAULT_CACHE = DATA_DIR / "features_cache.csv"
 # statistics for the pooled sentence-logprob calibration, so the calibration
 # can be recomputed exactly from the cache without re-running GPT-2.
 META_COLUMNS = ("_sent_count", "_sent_logprob_sum", "_sent_logprob_sumsq")
+
+# A bounded excerpt of each essay, cached alongside its features so
+# scripts/generate_evaluation.py can quote misclassified essays without
+# re-reading and re-aligning the source CSVs (whose row indices shift whenever
+# the dataset is rebuilt). Bounded rather than the full text to keep the cache
+# from becoming a second copy of the corpus.
+EXCERPT_COLUMN = "_text_excerpt"
+EXCERPT_CHARS = 400
 
 FALLBACK_LOGPROB_MEAN = -3.6
 FALLBACK_LOGPROB_STD = 1.1
@@ -178,13 +195,16 @@ def build_features(data: pd.DataFrame, bundle) -> tuple[pd.DataFrame, Counter]:
         record["_sent_count"] = len(scored)
         record["_sent_logprob_sum"] = float(sum(scored))
         record["_sent_logprob_sumsq"] = float(sum(v * v for v in scored))
+        record[EXCERPT_COLUMN] = text[:EXCERPT_CHARS]
 
         rows.append(record)
 
     if not rows:
         raise SystemExit("No essays survived feature extraction.")
 
-    columns = list(FEATURE_NAMES) + ["label", "source"] + list(META_COLUMNS)
+    columns = (
+        list(FEATURE_NAMES) + ["label", "source"] + list(META_COLUMNS) + [EXCERPT_COLUMN]
+    )
     return pd.DataFrame(rows, columns=columns), failures
 
 
@@ -217,16 +237,71 @@ def load_cache(path: Path) -> pd.DataFrame | None:
     cached = pd.read_csv(path)
     required = set(FEATURE_NAMES) | {"label", "source"} | set(META_COLUMNS)
     missing = required - set(cached.columns)
+    if not missing and EXCERPT_COLUMN not in cached.columns:
+        # Predates the excerpt column. Fine for training; only
+        # generate_evaluation.py needs it, and it says so if absent.
+        logger.warning(
+            "Cache has no %s column; re-run with --refresh-cache before "
+            "generating the evaluation report with excerpts.",
+            EXCERPT_COLUMN,
+        )
     if missing:
         raise SystemExit(
             f"{path} is stale: missing column(s) {sorted(missing)}.\n"
             "signals.FEATURE_NAMES has changed since it was written. Re-extract "
-            "with:\n  python -m scripts.train --refresh-cache"
+            "with:\n  python -m scripts.train_classifier --refresh-cache"
         )
 
     logger.info("Loaded %d cached feature rows from %s", len(cached), path.name)
     logger.info("Skipping GPT-2 extraction. Use --refresh-cache to force a re-run.")
     return cached
+
+
+def format_confusion(y_true: np.ndarray, y_pred: np.ndarray) -> str:
+    """Confusion matrix with the axes spelled out.
+
+    A bare 2x2 array is easy to read backwards. The two error cells matter in
+    opposite ways here: a false positive accuses a student who wrote their own
+    essay, a false negative just misses one. They are labelled.
+    """
+    matrix = confusion_matrix(y_true, y_pred, labels=[0, 1])
+    (tn, fp), (fn, tp) = matrix
+    return (
+        "\n                        predicted\n"
+        "                     human      AI\n"
+        f"    actual human  {tn:>7} {fp:>7}   <- {fp} false positive(s): human essay called AI\n"
+        f"           AI     {fn:>7} {tp:>7}   <- {fn} false negative(s): AI essay called human"
+    )
+
+
+def report_feature_weights(pipeline: Pipeline, feature_names: tuple[str, ...]) -> dict:
+    """Print the fitted coefficients, largest influence first.
+
+    This is the reason the model is a logistic regression and not something
+    opaque: the coefficients are the explanation. Because the features were
+    standardised first, the magnitudes are directly comparable -- a coefficient
+    of 1.2 really does move the logit twice as hard as one of 0.6, which is what
+    lets per-feature contributions be reported at inference time without
+    inventing a post-hoc story.
+    """
+    final = pipeline.named_steps["clf"]
+    coefficients = np.ravel(final.coef_)
+    weights = {name: float(c) for name, c in zip(feature_names, coefficients)}
+
+    logger.info("=" * 62)
+    logger.info("FEATURE WEIGHTS (standardised logistic-regression coefficients)")
+    logger.info("  positive -> pushes toward AI     negative -> pushes toward human")
+    logger.info("-" * 62)
+    for name, weight in sorted(weights.items(), key=lambda kv: abs(kv[1]), reverse=True):
+        logger.info(
+            "  %+8.4f  %-26s %s",
+            weight,
+            name,
+            "AI" if weight > 0 else "human" if weight < 0 else "-",
+        )
+    logger.info("  intercept: %+.4f", float(np.ravel(final.intercept_)[0]))
+    logger.info("=" * 62)
+    return weights
 
 
 def report_cross_validation(
@@ -274,6 +349,9 @@ def report_cross_validation(
         "  pooled out-of-fold report:\n%s",
         classification_report(y, predictions, zero_division=0),
     )
+    # Every row appears here exactly once, as an out-of-fold prediction -- so
+    # this counts real errors on unseen data, not the single-split version.
+    logger.info("  pooled out-of-fold confusion matrix:%s", format_confusion(y, predictions))
     logger.info("=" * 62)
 
 
@@ -328,7 +406,7 @@ def main() -> None:
         help="Ignore any cached features and re-run GPT-2 extraction.",
     )
     parser.add_argument("--folds", type=int, default=5)
-    parser.add_argument("--test-size", type=float, default=0.25)
+    parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -448,6 +526,7 @@ def main() -> None:
     logger.info("Final model fit on %d rows (%d held out).", len(y_train), len(y_test))
 
     if len(np.unique(y_test)) > 1:
+        test_predictions = pipeline.predict(X_test)
         held_out = pipeline.score(X_test, y_test)
         auc = roc_auc_score(y_test, pipeline.predict_proba(X_test)[:, 1])
         logger.info(
@@ -456,6 +535,17 @@ def main() -> None:
             held_out,
             auc,
         )
+        logger.info(
+            "  held-out report:\n%s",
+            classification_report(y_test, test_predictions, zero_division=0),
+        )
+        logger.info(
+            "  held-out confusion matrix:%s",
+            format_confusion(y_test, test_predictions),
+        )
+
+    # The coefficients of the model actually being saved.
+    feature_weights = report_feature_weights(pipeline, FEATURE_NAMES)
 
     # --- Save -------------------------------------------------------------
     payload = {
@@ -465,6 +555,9 @@ def main() -> None:
         "model": pipeline,
         "scaler": pipeline.named_steps["scaler"],
         "feature_names": list(FEATURE_NAMES),
+        # Same numbers as model.coef_, stored plainly so Phase 5 explainability
+        # can read a name -> weight mapping without unwrapping the pipeline.
+        "feature_weights": feature_weights,
         "version": datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S"),
         "sentence_logprob_mean": logprob_mean,
         "sentence_logprob_std": logprob_std,
