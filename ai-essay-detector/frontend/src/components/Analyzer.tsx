@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   ApiError,
   analyzeEssay,
@@ -9,6 +9,7 @@ import {
   WORD_LIMITS,
 } from '../api'
 import type { AnalyzeResponse } from '../types'
+import { useCanAnimate } from '../lib/useCanAnimate'
 import { ProbabilityGauge } from './ProbabilityGauge'
 import { EssayHighlights } from './EssayHighlights'
 
@@ -25,7 +26,10 @@ export function Analyzer({ onBack }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
-  const reduceMotion = useReducedMotion()
+  const canAnimate = useCanAnimate()
+  const reduceMotion = !canAnimate
+  // Entrance/exit target for the reason panel; undefined disables it entirely.
+  const panelMotion = canAnimate ? { opacity: 0, y: 4 } : undefined
   const abortRef = useRef<AbortController | null>(null)
   const panelId = useId()
   const counterId = useId()
@@ -263,41 +267,55 @@ export function Analyzer({ onBack }: Props) {
               aria-label, so nothing here is the only route to the evidence.
             */}
             <div id={panelId} className="panel" aria-live="polite">
-              {openSentence ? (
-                <>
-                  <div className="panel__head">
-                    <h2>Why this sentence</h2>
-                    <button
-                      type="button"
-                      className="panel__close"
-                      onClick={() => setOpenIndex(null)}
-                    >
-                      Close
-                    </button>
-                  </div>
-                  <blockquote>{openSentence.text}</blockquote>
-                  <p className="panel__reason">{openSentence.reason}</p>
-                  <dl className="panel__stats">
-                    <div>
-                      <dt>Deviation from this essay's norm</dt>
-                      <dd>{openSentence.local_score?.toFixed(2) ?? '—'}</dd>
+              {/*
+                The container stays mounted so aria-controls always has a valid
+                target and the live region is never torn down mid-announcement;
+                only the contents animate. `mode="wait"` keeps the old reason
+                from overlapping the new one when moving between sentences.
+              */}
+              <AnimatePresence mode="wait" initial={false}>
+                {openSentence ? (
+                  <motion.div
+                    key={openSentence.index}
+                    initial={panelMotion}
+                    animate={panelMotion ? { opacity: 1, y: 0 } : undefined}
+                    exit={panelMotion ? { opacity: 0, y: -4 } : undefined}
+                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                  >
+                    <div className="panel__head">
+                      <h2>Why this sentence</h2>
+                      <button
+                        type="button"
+                        className="panel__close"
+                        onClick={() => setOpenIndex(null)}
+                      >
+                        Close
+                      </button>
                     </div>
-                    <div>
-                      <dt>Predictability (z)</dt>
-                      <dd>{openSentence.ppl_z?.toFixed(2) ?? '—'}</dd>
-                    </div>
-                    <div>
-                      <dt>Length (z)</dt>
-                      <dd>{openSentence.length_z?.toFixed(2) ?? '—'}</dd>
-                    </div>
-                  </dl>
-                  <p className="panel__hint">Press Escape to close.</p>
-                </>
-              ) : (
-                <p className="panel__empty">
-                  Select a flagged sentence to see why it was flagged.
-                </p>
-              )}
+                    <blockquote>{openSentence.text}</blockquote>
+                    <p className="panel__reason">{openSentence.reason}</p>
+                    <dl className="panel__stats">
+                      <div>
+                        <dt>Deviation from this essay's norm</dt>
+                        <dd>{openSentence.local_score?.toFixed(2) ?? '—'}</dd>
+                      </div>
+                      <div>
+                        <dt>Predictability (z)</dt>
+                        <dd>{openSentence.ppl_z?.toFixed(2) ?? '—'}</dd>
+                      </div>
+                      <div>
+                        <dt>Length (z)</dt>
+                        <dd>{openSentence.length_z?.toFixed(2) ?? '—'}</dd>
+                      </div>
+                    </dl>
+                    <p className="panel__hint">Press Escape to close.</p>
+                  </motion.div>
+                ) : (
+                  <motion.p key="empty" className="panel__empty" initial={false}>
+                    Select a flagged sentence to see why it was flagged.
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
 
             <p className="results__meta">

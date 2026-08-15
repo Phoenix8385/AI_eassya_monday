@@ -1,6 +1,7 @@
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { HeroVisual } from './hero/HeroVisual'
 import { TextReveal } from './TextReveal'
+import { useCanAnimate } from '../lib/useCanAnimate'
 
 interface Props {
   onStart: () => void
@@ -16,16 +17,17 @@ interface Props {
  * before WebGL has been asked for, let alone finished loading.
  */
 export function Landing({ onStart }: Props) {
-  const reduceMotion = useReducedMotion()
+  const canAnimate = useCanAnimate()
 
   // Copy and CTA fade in on their own short timeline, independent of the 3D
-  // layer — they are never waiting on it.
-  const fade = reduceMotion
-    ? undefined
-    : ({
+  // layer — they are never waiting on it. When the entrance cannot run, the
+  // variants are dropped entirely so nothing is left holding opacity 0.
+  const fade = canAnimate
+    ? ({
         hidden: { opacity: 0, y: 12 },
         visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
       } as const)
+    : undefined
 
   return (
     <main className="landing">

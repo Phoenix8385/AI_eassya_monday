@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import type { Sentence } from '../types'
+import { useCanAnimate } from '../lib/useCanAnimate'
 
 interface Props {
   sentences: Sentence[]
@@ -42,7 +43,6 @@ export function EssayHighlights({
   onClose,
   panelId,
 }: Props) {
-  const reduceMotion = useReducedMotion()
   const refs = useRef(new Map<number, HTMLElement>())
 
   // Escape closes from anywhere and returns focus to the sentence that opened
@@ -85,15 +85,9 @@ export function EssayHighlights({
   // reason, intensity, ARIA — is readable exactly as rendered. The animation is
   // layered on correct content; it is never what makes the content appear.
   //
-  // The visibility check is not paranoia. requestAnimationFrame is suspended in
-  // a background tab, so a stagger that starts there never ticks: someone who
-  // switches away while the request is in flight would come back to an essay
-  // whose every sentence is still at opacity 0. Analysis takes seconds, which
-  // makes switching away the normal thing to do, not the edge case.
-  const canAnimate =
-    !reduceMotion &&
-    typeof document !== 'undefined' &&
-    document.visibilityState === 'visible'
+  // See useCanAnimate: reduced motion and background tabs both mean the
+  // entrance will not run, and neither may be allowed to hide the essay.
+  const canAnimate = useCanAnimate()
 
   // Bounded, not per-item-fixed. The backend returns up to
   // MAX_EXPLAINED_SENTENCES (200) sentences; a flat 0.035s step would leave the

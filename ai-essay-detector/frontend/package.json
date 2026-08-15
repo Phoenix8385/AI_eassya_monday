@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "check:ssr": "rolldown checks/ssr-check.tsx --format cjs --platform node -o node_modules/.tmp/ssr-check.cjs && node node_modules/.tmp/ssr-check.cjs",
+    "check:ssr": "rolldown checks/ssr-check.tsx --format cjs --platform node --no-codeSplitting -o node_modules/.tmp/ssr-check.cjs && node node_modules/.tmp/ssr-check.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

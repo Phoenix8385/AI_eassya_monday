@@ -163,6 +163,33 @@ check(
   landingHtml.includes('aria-hidden="true"'),
 )
 
+// --- Hero, with no browser ------------------------------------------------
+// renderToStaticMarkup is the no-JS / no-WebGL case. The hero must degrade to
+// the static field, and — the part that actually bit — none of the landing
+// copy may be left holding an entrance animation's start state.
+check(
+  'hero falls back to the static scan field, not a <canvas>',
+  landingHtml.includes('scanfield-static') && !landingHtml.includes('<canvas'),
+)
+check(
+  'three.js is not required to render the hero',
+  !landingHtml.includes('webgl'),
+)
+check(
+  'headline words are real text, not only a masked animation target',
+  landingHtml.includes('Measured signals') && landingHtml.includes('chatbot'),
+)
+check(
+  'no opacity:0 anywhere in the landing markup',
+  !/opacity:\s*0(?![.\d])/.test(landingHtml),
+  (landingHtml.match(/opacity:\s*[\d.]+/g) ?? []).join(' '),
+)
+check(
+  'landing body copy is present, not hidden behind an entrance',
+  landingHtml.includes('logistic-regression') &&
+    landingHtml.includes('Results are a likelihood'),
+)
+
 console.log(results.join('\n'))
 console.log(failures === 0 ? '\nALL SSR/DOM CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`)
 if (failures > 0) process.exit(1)

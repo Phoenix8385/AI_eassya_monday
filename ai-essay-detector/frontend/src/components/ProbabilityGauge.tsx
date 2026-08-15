@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { animate, useMotionValue, useReducedMotion } from 'framer-motion'
+import { animate, useMotionValue } from 'framer-motion'
+import { useCanAnimate } from '../lib/useCanAnimate'
 import type { Label } from '../types'
 
 interface Props {
@@ -24,7 +25,10 @@ const ARC = CIRCUMFERENCE * SWEEP
  * is that sentence — so a screen reader hears the framing, not a bare figure.
  */
 export function ProbabilityGauge({ probability, confidenceLabel, label }: Props) {
-  const reduceMotion = useReducedMotion()
+  // Same rule as every other entrance here: if the count-up cannot run, the
+  // gauge shows the real number immediately rather than a 0% that never moves.
+  const canCountUp = useCanAnimate()
+  const reduceMotion = !canCountUp
   const progress = useMotionValue(reduceMotion ? probability : 0)
   // Mirrored into state so the digits can render as plain text: real text is
   // selectable and survives if the animation never runs.
@@ -37,9 +41,7 @@ export function ProbabilityGauge({ probability, confidenceLabel, label }: Props)
     // during the request comes back to a gauge reading 0% sitting next to a
     // sentence saying 99%. Same rule as the sentence stagger: the animation
     // decorates a value that is already right, it never produces one.
-    const canCount = !reduceMotion && document.visibilityState === 'visible'
-
-    if (!canCount) {
+    if (!canCountUp) {
       progress.set(probability)
       setShown(probability)
       return
@@ -60,7 +62,7 @@ export function ProbabilityGauge({ probability, confidenceLabel, label }: Props)
       controls.stop()
       unsubscribe()
     }
-  }, [probability, reduceMotion, progress])
+  }, [probability, reduceMotion, canCountUp, progress])
 
   const percent = Math.round(shown * 100)
   const offset = ARC * (1 - shown)

@@ -358,8 +358,16 @@ body {
   color: var(--warn-fg);
 }
 
+/*
+  A valid length gets no colour at all.
+
+  Green here would be a second accent competing with amber, and it would be
+  paid for nothing: "no warning" is already the signal that the length is fine.
+  Colour is spent only where it carries information — amber for a signal the
+  tool is pointing at, the danger tone for a length that will be rejected.
+*/
 .counter.is-ok strong {
-  color: var(--ok);
+  color: var(--text-h);
 }
 
 /* Scanning overlay during a request ---------------------------------------- */

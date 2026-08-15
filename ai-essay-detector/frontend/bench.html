@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scan field — perf harness</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0; background: #0b0d10; color: #eef1f5;
+        font: 15px/1.5 system-ui, sans-serif;
+      }
+      #stage { position: fixed; inset: 0; z-index: 0; }
+      #panel {
+        position: relative; z-index: 1; margin: 1.25rem; padding: 1.25rem 1.5rem;
+        max-width: 44rem; border: 1px solid #1b2029; border-radius: 12px;
+        background: rgba(11,13,16,.92);
+      }
+      h1 { font-size: 1.1rem; margin: 0 0 .5rem; }
+      p { margin: 0 0 .9rem; color: #98a1ae; }
+      table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+      th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid #1b2029; }
+      th { color: #98a1ae; font-weight: 500; }
+      .v { font-family: ui-monospace, Consolas, monospace; color: #f0a93c; }
+      .verdict { margin-top: 1rem; padding: .75rem 1rem; border-radius: 8px; border: 1px solid #1b2029; }
+      .ok { border-color: rgba(111,158,120,.5); }
+      .bad { border-color: rgba(240,169,60,.6); }
+      button {
+        font: inherit; padding: .5rem 1rem; border-radius: 8px; cursor: pointer;
+        border: 1px solid #b8720b; background: transparent; color: #f0a93c;
+      }
+      label { color: #98a1ae; margin-right: 1rem; }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="panel">
+      <h1>Scan field — perf harness</h1>
+      <p>
+        Runs the shipping hero shader and geometry at a chosen particle count and
+        reports the frame rate it actually sustains. Open this on the slowest
+        machine you care about; the number that matters is <strong>sustained
+        FPS</strong>, measured over several seconds with the tab focused and
+        visible.
+      </p>
+      <p>
+        <label>Points <input id="count" type="number" value="8000" step="500" min="500" max="40000" /></label>
+        <button id="run">Run 6s measurement</button>
+        <button id="freeze">Freeze a frame</button>
+      </p>
+      <table>
+        <tbody>
+          <tr><th>Points rendered</th><td class="v" id="r-points">—</td></tr>
+          <tr><th>Sustained FPS (rAF)</th><td class="v" id="r-fps">—</td></tr>
+          <tr><th>Median frame cost (GPU-synced)</th><td class="v" id="r-median">—</td></tr>
+          <tr><th>95th-percentile frame cost</th><td class="v" id="r-p95">—</td></tr>
+          <tr><th>Draw calls / frame</th><td class="v" id="r-calls">—</td></tr>
+          <tr><th>Renderer</th><td class="v" id="r-gpu">—</td></tr>
+          <tr><th>Tab visible during run</th><td class="v" id="r-vis">—</td></tr>
+        </tbody>
+      </table>
+      <div class="verdict" id="verdict">Not measured yet.</div>
+    </div>
+    <script type="module" src="/src/bench/scanFieldBench.ts"></script>
+  </body>
+</html>

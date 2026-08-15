@@ -16,8 +16,9 @@
  * content visible.
  */
 
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import type { ReactNode } from 'react'
+import { useCanAnimate } from '../lib/useCanAnimate'
 
 interface Props {
   /** Plain text. Split on whitespace for the per-word mask. */
@@ -39,15 +40,7 @@ export function TextReveal({
   delay = 0,
   as: Tag = 'h1',
 }: Props) {
-  const reduceMotion = useReducedMotion()
-
-  // requestAnimationFrame is suspended in a background tab, so a reveal that
-  // starts there never runs and would leave the headline permanently blank.
-  const canAnimate =
-    !reduceMotion &&
-    typeof document !== 'undefined' &&
-    document.visibilityState === 'visible'
-
+  const canAnimate = useCanAnimate()
   const words = text.split(/\s+/).filter(Boolean)
 
   if (!canAnimate) {
