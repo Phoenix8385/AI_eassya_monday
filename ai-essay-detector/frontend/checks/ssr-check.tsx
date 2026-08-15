@@ -4,13 +4,17 @@
  *
  * This is the progressive-enhancement requirement stated directly: the stagger
  * is an entrance effect on top of correct content, never the mechanism that
- * makes content exist. Temporary file — deleted after the check.
+ * makes content exist. If this file fails, a reader whose animation never ran
+ * is looking at a blank result panel.
+ *
+ * Run with `npm run check:ssr`. It lives outside `src/` on purpose — it is a
+ * Node program, not part of the browser bundle.
  */
 import { renderToStaticMarkup } from 'react-dom/server'
-import { EssayHighlights } from './components/EssayHighlights'
-import { ProbabilityGauge } from './components/ProbabilityGauge'
-import { Landing } from './components/Landing'
-import type { Sentence } from './types'
+import { EssayHighlights } from '../src/components/EssayHighlights'
+import { ProbabilityGauge } from '../src/components/ProbabilityGauge'
+import { Landing } from '../src/components/Landing'
+import type { Sentence } from '../src/types'
 
 function sentence(over: Partial<Sentence> & { index: number; text: string }): Sentence {
   return {
@@ -102,11 +106,10 @@ check(
   html.includes('--intensity:1.000') || html.includes('--intensity:0.760'),
   (html.match(/--intensity:[\d.]+/g) ?? []).join(' '),
 )
-// The critical one: nothing is hidden behind an animation that never ran.
-check(
-  'no opacity:0 anywhere in the static markup',
-  !/opacity:\s*0(?![.\d])/.test(html),
-)
+// The critical pair: with no JS runtime to run the entrance animation, nothing
+// may be left hidden by that animation's start state.
+check('no opacity:0 anywhere in the static markup', !/opacity:\s*0(?![.\d])/.test(html))
+check('no entrance transform left applied', !/translateY/.test(html))
 
 // --- Null local_score -----------------------------------------------------
 const unscoredHtml = renderToStaticMarkup(
@@ -118,7 +121,10 @@ const unscoredHtml = renderToStaticMarkup(
     panelId="panel"
   />,
 )
-check('null-score sentences still render their text', unscoredHtml.includes('Only three sentences here.'))
+check(
+  'null-score sentences still render their text',
+  unscoredHtml.includes('Only three sentences here.'),
+)
 check('null-score uses the distinct unscored style', unscoredHtml.includes('is-unscored'))
 check(
   'null-score sets no intensity (not treated as zero signal)',
@@ -133,8 +139,14 @@ const gaugeHtml = renderToStaticMarkup(
     label="Likely AI"
   />,
 )
-check('gauge exposes the full sentence as its accessible name', gaugeHtml.includes('aria-label="This essay shares 87%'))
-check('confidence_label sentence is rendered as visible text', gaugeHtml.includes('<figcaption'))
+check(
+  'gauge exposes the full sentence as its accessible name',
+  gaugeHtml.includes('aria-label="This essay shares 87%'),
+)
+check(
+  'confidence_label sentence is rendered as visible text',
+  gaugeHtml.includes('<figcaption'),
+)
 check('short tag rendered alongside, not alone', gaugeHtml.includes('Likely AI'))
 
 // --- Landing --------------------------------------------------------------
@@ -146,7 +158,10 @@ check(
   landingHtml.includes('No language model is asked whether the essay is AI-written'),
 )
 check('landing has the CTA', landingHtml.includes('Analyze an essay'))
-check('decorative visual is hidden from assistive tech', landingHtml.includes('aria-hidden="true"'))
+check(
+  'decorative visual is hidden from assistive tech',
+  landingHtml.includes('aria-hidden="true"'),
+)
 
 console.log(results.join('\n'))
 console.log(failures === 0 ? '\nALL SSR/DOM CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`)

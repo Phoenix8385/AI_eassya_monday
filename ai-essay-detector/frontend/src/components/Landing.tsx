@@ -1,30 +1,62 @@
 import { motion, useReducedMotion } from 'framer-motion'
+import { HeroVisual } from './hero/HeroVisual'
+import { TextReveal } from './TextReveal'
 
 interface Props {
   onStart: () => void
 }
 
-const SCAN_LINES = [92, 76, 88, 61, 84, 70]
-
 /**
  * Hero. The paragraph is the point: the brief distinguishes a real signal
  * pipeline from an LLM asked for a verdict, so the mechanism is stated
  * outright rather than gestured at with "AI-powered".
+ *
+ * The 3D scan field sits behind this content in its own layer. It is decorative
+ * and `aria-hidden`; every word here renders and every control here works
+ * before WebGL has been asked for, let alone finished loading.
  */
 export function Landing({ onStart }: Props) {
   const reduceMotion = useReducedMotion()
 
+  // Copy and CTA fade in on their own short timeline, independent of the 3D
+  // layer — they are never waiting on it.
+  const fade = reduceMotion
+    ? undefined
+    : ({
+        hidden: { opacity: 0, y: 12 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
+      } as const)
+
   return (
     <main className="landing">
-      <section className="landing__intro">
-        <p className="eyebrow">Admissions essay analysis</p>
-        <h1>
-          Measured signals,
-          <br />
-          not a second opinion from a chatbot.
-        </h1>
+      {/* Decorative layer. Never focusable, never announced. */}
+      <div className="landing__visual">
+        <HeroVisual />
+      </div>
 
-        <p className="lede">
+      <section className="landing__intro">
+        <motion.p
+          className="eyebrow"
+          variants={fade}
+          initial={fade ? 'hidden' : false}
+          animate="visible"
+        >
+          Admissions essay analysis
+        </motion.p>
+
+        <TextReveal
+          className="landing__headline"
+          text="Measured signals, not a second opinion from a chatbot."
+          delay={0.1}
+        />
+
+        <motion.p
+          className="lede"
+          variants={fade}
+          initial={fade ? 'hidden' : false}
+          animate="visible"
+          transition={{ delay: 0.45 }}
+        >
           This tool runs a local <strong>GPT-2</strong> over your essay and records
           how predictable each token is, how much sentence rhythm varies from one
           sentence to the next (<em>burstiness</em>), and a set of stylistic
@@ -32,64 +64,36 @@ export function Landing({ onStart }: Props) {
           writing leans on connectives like <em>moreover</em> and{' '}
           <em>furthermore</em>. Those numbers feed a logistic-regression
           classifier trained here, on labelled human and AI essays.{' '}
-          <strong>
-            No language model is asked whether the essay is AI-written.
-          </strong>{' '}
+          <strong>No language model is asked whether the essay is AI-written.</strong>{' '}
           Nothing is sent to a chatbot for judgement — the verdict-shaped
           question is never asked, because a model's opinion about authorship
           isn't evidence. What comes back is a probability, the signals behind
           it, and which sentences moved it.
-        </p>
+        </motion.p>
 
-        <button type="button" className="cta" onClick={onStart}>
-          Analyze an essay
-        </button>
+        <motion.div
+          variants={fade}
+          initial={fade ? 'hidden' : false}
+          animate="visible"
+          transition={{ delay: 0.55 }}
+        >
+          <button type="button" className="cta cta--primary" onClick={onStart}>
+            Analyze an essay
+          </button>
+        </motion.div>
 
-        <p className="landing__caveat">
+        <motion.p
+          className="landing__caveat"
+          variants={fade}
+          initial={fade ? 'hidden' : false}
+          animate="visible"
+          transition={{ delay: 0.65 }}
+        >
           Results are a likelihood, not a verdict. Read{' '}
           <span className="nowrap">what this can and cannot show</span> before
           acting on one.
-        </p>
+        </motion.p>
       </section>
-
-      {/*
-        Decorative. Under prefers-reduced-motion this renders as the finished
-        state — every line at full opacity with the scan bar parked — rather
-        than the same animation played slowly.
-      */}
-      <div className="scanner" aria-hidden="true">
-        <div className="scanner__frame">
-          {SCAN_LINES.map((width, i) => (
-            <motion.span
-              key={i}
-              className="scanner__line"
-              style={{ width: `${width}%` }}
-              initial={reduceMotion ? false : { opacity: 0.25 }}
-              animate={reduceMotion ? { opacity: 1 } : { opacity: [0.25, 1, 0.25] }}
-              transition={
-                reduceMotion
-                  ? { duration: 0 }
-                  : {
-                      duration: 2.4,
-                      repeat: Infinity,
-                      delay: i * 0.28,
-                      ease: 'easeInOut',
-                    }
-              }
-            />
-          ))}
-          {reduceMotion ? (
-            <span className="scanner__bar is-parked" />
-          ) : (
-            <motion.span
-              className="scanner__bar"
-              initial={{ y: '0%' }}
-              animate={{ y: ['0%', '520%', '0%'] }}
-              transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          )}
-        </div>
-      </div>
     </main>
   )
 }

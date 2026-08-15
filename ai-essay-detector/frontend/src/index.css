@@ -1,15 +1,45 @@
+/* ---------------------------------------------------------------------------
+   Forensic palette.
+
+   Deep ink base, one accent. Amber (#B8720B) is reserved for active and
+   flagged states only — it is the colour that means "the tool is pointing at
+   something". Nothing else competes for it, which is what makes a flagged
+   sentence legible at a glance instead of one highlight among several.
+
+   Committed dark: this is an instrument panel, not a document. The light
+   scheme is not offered rather than half-supported.
+--------------------------------------------------------------------------- */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  --ink-900: #0b0d10; /* page */
+  --ink-850: #0e1116; /* raised panels */
+  --ink-800: #131720; /* inputs, code */
+  --ink-700: #1b2029; /* borders */
+  --ink-600: #2a2f38; /* dim marks — matches INK in the 3D scene */
+
+  --text: #98a1ae;
+  --text-h: #eef1f5;
+  --text-dim: #6b7583;
+
+  --bg: var(--ink-900);
+  --panel: var(--ink-850);
+  --border: var(--ink-700);
+  --code-bg: var(--ink-800);
+
+  /* The single accent, in the three forms the UI actually needs. */
+  --amber: #b8720b;
+  --amber-hot: #f0a93c;
+  --amber-dim: rgba(184, 114, 11, 0.16);
+  --amber-line: rgba(184, 114, 11, 0.45);
+
+  --accent: var(--amber);
+  --accent-bg: var(--amber-dim);
+  --accent-border: var(--amber-line);
+
+  /* Focus is the accent too — one accent means one focus colour. */
+  --focus: var(--amber-hot);
+
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(0, 0, 0, 0.5) 0 10px 30px -12px, rgba(0, 0, 0, 0.35) 0 4px 10px -4px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -17,7 +47,7 @@
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
-  color-scheme: light dark;
+  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -30,40 +60,19 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+html,
+body {
+  margin: 0;
+  background: var(--bg);
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-}
-
-body {
-  margin: 0;
 }
 
 h1,
@@ -82,6 +91,7 @@ h1 {
     margin: 20px 0;
   }
 }
+
 h2 {
   font-size: 24px;
   line-height: 118%;
@@ -91,6 +101,7 @@ h2 {
     font-size: 20px;
   }
 }
+
 p {
   margin: 0;
 }
@@ -108,4 +119,22 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+/* ---------------------------------------------------------------------------
+   Focus. One visible ring, in the accent, on everything focusable.
+
+   :focus-visible rather than :focus so a mouse click doesn't leave a ring
+   behind, but every keyboard path shows one. The offset keeps it clear of
+   amber-tinted sentence backgrounds, where a flush ring would disappear.
+--------------------------------------------------------------------------- */
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+::selection {
+  background: var(--amber);
+  color: #fff;
 }

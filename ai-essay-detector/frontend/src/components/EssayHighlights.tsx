@@ -78,21 +78,44 @@ export function EssayHighlights({
   // The stagger is an entrance effect only. Under reduced motion the list is
   // rendered without motion wrappers at all — a static end state, not a slow
   // version of the same animation.
-  const container = reduceMotion
-    ? undefined
-    : { visible: { transition: { staggerChildren: 0.035 } } }
-  const item = reduceMotion
-    ? undefined
-    : {
+  //
+  // `hidden` writes opacity:0 inline on the first render, so it is only ever
+  // introduced when something is guaranteed to take it away again. Without that
+  // the markup carries no hidden state at all and every sentence — text,
+  // reason, intensity, ARIA — is readable exactly as rendered. The animation is
+  // layered on correct content; it is never what makes the content appear.
+  //
+  // The visibility check is not paranoia. requestAnimationFrame is suspended in
+  // a background tab, so a stagger that starts there never ticks: someone who
+  // switches away while the request is in flight would come back to an essay
+  // whose every sentence is still at opacity 0. Analysis takes seconds, which
+  // makes switching away the normal thing to do, not the edge case.
+  const canAnimate =
+    !reduceMotion &&
+    typeof document !== 'undefined' &&
+    document.visibilityState === 'visible'
+
+  // Bounded, not per-item-fixed. The backend returns up to
+  // MAX_EXPLAINED_SENTENCES (200) sentences; a flat 0.035s step would leave the
+  // last one invisible for seven seconds. Spreading a fixed budget instead
+  // keeps the whole entrance under ~1.2s however long the essay is.
+  const stagger = Math.min(0.035, 1.2 / Math.max(sentences.length, 1))
+
+  const container = canAnimate
+    ? { visible: { transition: { staggerChildren: stagger } } }
+    : undefined
+  const item = canAnimate
+    ? {
         hidden: { opacity: 0, y: 6 },
         visible: { opacity: 1, y: 0, transition: { duration: 0.32 } },
       }
+    : undefined
 
   return (
     <motion.p
-      className={`essay ${reduceMotion ? 'is-static' : ''}`}
+      className={`essay ${canAnimate ? '' : 'is-static'}`}
       variants={container}
-      initial={reduceMotion ? false : 'hidden'}
+      initial={canAnimate ? 'hidden' : false}
       animate="visible"
     >
       {sentences.map((sentence) => {

@@ -40,16 +40,18 @@ export function Analyzer({ onBack }: Props) {
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
+  // Continues the "<n> words" already rendered beside it, so the count is
+  // stated once rather than repeated back in every branch.
   const lengthMessage = (() => {
     switch (length) {
       case 'empty':
         return null
       case 'too-short':
-        return `${words} words — ${WORD_LIMITS.MIN - words} more needed. Below ${WORD_LIMITS.MIN} words there aren't enough sentences for the per-sentence signals to mean anything.`
+        return `${WORD_LIMITS.MIN - words} more needed. Below ${WORD_LIMITS.MIN} words there aren't enough sentences for the per-sentence signals to mean anything.`
       case 'long':
-        return `${words} words — longer than a typical admissions essay. This will still be analysed, but scoring time grows with length.`
+        return `longer than a typical admissions essay. This will still be analysed, but scoring time grows with length.`
       case 'too-long':
-        return `${words} words — over the ${WORD_LIMITS.HARD_MAX.toLocaleString()} word maximum. Submit a single essay rather than a combined document.`
+        return `over the ${WORD_LIMITS.HARD_MAX.toLocaleString()} word maximum. Submit a single essay rather than a combined document.`
       default:
         return null
     }
@@ -101,13 +103,16 @@ export function Analyzer({ onBack }: Props) {
           ? `Analysis failed. ${error}`
           : ''
 
-  const unscored =
-    result !== null &&
-    result.sentences.length > 0 &&
-    result.sentences.every((s) => s.local_score === null)
-  const unscoredReason = unscored
-    ? (result.sentences.find((s) => s.reason)?.reason ??
-      'This essay had too few sentences to score individually.')
+  // Keyed off "any sentence unscored" rather than "all of them". The backend
+  // skips localization for the whole essay or not at all, so today these agree
+  // — but a partially-localized response would still get its hatched sentences
+  // explained instead of leaving them silently unaccounted for. The reason is
+  // read off an actually-unscored sentence, so a flagged sentence's reason can
+  // never be shown here in its place. No trailing period: the notice supplies
+  // one, and the backend's text does not carry its own.
+  const firstUnscored = result?.sentences.find((s) => s.local_score === null) ?? null
+  const unscoredReason = firstUnscored
+    ? (firstUnscored.reason ?? 'This essay had too few sentences to score individually')
     : null
 
   const openSentence =
@@ -188,8 +193,13 @@ export function Analyzer({ onBack }: Props) {
         {announcement}
       </div>
 
+      {/*
+        Visible twin of the announcement above. Deliberately NOT role="alert":
+        the polite region already carries this exact text, and an assertive
+        alert on top of it makes a screen reader read the failure twice.
+      */}
       {status === 'error' && error && (
-        <p className="alert" role="alert">
+        <p className="alert">
           <strong>Analysis failed.</strong> {error}
         </p>
       )}

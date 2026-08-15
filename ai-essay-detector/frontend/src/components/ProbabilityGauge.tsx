@@ -31,15 +31,30 @@ export function ProbabilityGauge({ probability, confidenceLabel, label }: Props)
   const [shown, setShown] = useState(reduceMotion ? probability : 0)
 
   useEffect(() => {
-    if (reduceMotion) {
+    // The readout has to be correct whether or not a single frame ever
+    // renders. requestAnimationFrame is suspended in a background tab, so a
+    // count-up started there never ticks — and someone who switched away
+    // during the request comes back to a gauge reading 0% sitting next to a
+    // sentence saying 99%. Same rule as the sentence stagger: the animation
+    // decorates a value that is already right, it never produces one.
+    const canCount = !reduceMotion && document.visibilityState === 'visible'
+
+    if (!canCount) {
       progress.set(probability)
       setShown(probability)
       return
     }
+
+    progress.set(0)
+    setShown(0)
     const unsubscribe = progress.on('change', setShown)
     const controls = animate(progress, probability, {
       duration: 1.1,
       ease: [0.22, 1, 0.36, 1],
+      // Commits the exact target even if the last frame lands a hair short,
+      // or if the tab was hidden mid-flight and the animation resumed past
+      // its own duration.
+      onComplete: () => setShown(probability),
     })
     return () => {
       controls.stop()
