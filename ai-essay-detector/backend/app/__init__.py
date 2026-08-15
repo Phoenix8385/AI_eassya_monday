@@ -1,0 +1,1 @@
+"""AI Essay Detector backend."""

@@ -141,3 +141,26 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# --- Python / backend -----------------------------------------------------
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Trained model artifacts. Hundreds of MB and fully reproducible -- regenerate
+# with `python -m scripts.train` rather than committing a binary.
+*.joblib
+*.pkl

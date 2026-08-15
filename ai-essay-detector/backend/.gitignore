@@ -1,0 +1,49 @@
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Environment files (the example is tracked on purpose)
+.env
+.env.*
+!.env.example
+
+# Trained model artifacts. These run to hundreds of MB and are reproducible --
+# regenerate with `python -m scripts.train` rather than committing a binary.
+*.joblib
+*.pkl
+app/data/*.joblib
+
+# Large datasets. Keep small, checked-in sample CSVs by force-adding them:
+#   git add -f app/data/sample_essays.csv
+app/data/*.csv
+!app/data/sample_essays.csv
+
+# Raw Kaggle download + everything derived from it. Regenerate with
+# `kaggle competitions download` + scripts/prepare_daigt.py.
+app/data/raw/
+*.zip
+
+# Polish-run state. The cache holds paid API output — losing it costs money to
+# rebuild, but it is per-machine working state, not source.
+app/data/polished_cache.jsonl
+app/data/failures.log
+
+# Model caches
+.cache/
+*.pt
+*.bin
+*.safetensors
