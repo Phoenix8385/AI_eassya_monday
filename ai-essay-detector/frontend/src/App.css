@@ -1,3 +1,9 @@
+/* The showcase intro keeps its own stylesheet — it is a self-contained motion
+   piece, not part of the analyzer's surface — but it is pulled in here rather
+   than imported by the component, so the component stays plain TS and the
+   Node-side render check can bundle it. Must stay above every rule below. */
+@import './components/ShowcaseIntro.css';
+
 /* ---------------------------------------------------------------------------
    Signal palette.
 

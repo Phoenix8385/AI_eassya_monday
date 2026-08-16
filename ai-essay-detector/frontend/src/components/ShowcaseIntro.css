@@ -1,0 +1,363 @@
+/* ---------------------------------------------------------------------------
+   Showcase intro.
+
+   Everything static about the piece lives here; ShowcaseIntro.tsx owns only
+   what changes per frame (opacity, transforms, the dial's fill angle, bar
+   heights). That split is the point — the stylesheet is readable as a design,
+   and the component is readable as a timeline.
+
+   Sizing. The design was composed on a fixed 1920x1080 stage, so its measures
+   are absolute pixels. They are reproduced here as `clamp(floor, Nvw, design)`
+   where N is the design value as a share of 1920 — the composition is exact at
+   that width, shrinks proportionally below it, and never grows past what was
+   drawn. Colours come from the app's own tokens in index.css, which is where
+   the handoff's palette was taken from in the first place.
+--------------------------------------------------------------------------- */
+
+.showcase {
+  position: relative;
+  width: 100%;
+  min-height: 100svh;
+  overflow: hidden;
+  background: var(--ink-900);
+  /* Keeps the particle glow and the scrim from blending with the page. */
+  isolation: isolate;
+}
+
+/* The photo is referenced from here rather than imported into the component so
+   the module stays plain TS/JS — importable by the Node-side render checks,
+   which have no asset loaders. Vite still fingerprints it. */
+.showcase__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url('../assets/showcase-bg.png');
+  background-size: cover;
+  background-position: center;
+}
+
+/* Legibility floor over the photo. Without it the amber eyebrow sits on
+   whatever happens to be behind it. */
+.showcase__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(11, 13, 16, 0.82),
+    rgba(11, 13, 16, 0.68) 40%,
+    rgba(11, 13, 16, 0.9)
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Particle field.
+--------------------------------------------------------------------------- */
+
+.showcase__particles {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  perspective: 1200px;
+  overflow: hidden;
+  /* 46 elements moving on percentage offsets every frame: keeping their layout
+     and paint inside this box stops the rest of the page being consulted. */
+  contain: layout paint;
+}
+
+.showcase__depth {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.showcase__particle {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--amber-hot);
+}
+
+/* ---------------------------------------------------------------------------
+   Scenes.
+
+   All five occupy the same box and are cut in and out on the timeline; only
+   one is ever visible while the loop plays.
+--------------------------------------------------------------------------- */
+
+/* z-index, not DOM order: the poster below turns these into flow elements,
+   and an unpositioned element paints under every absolute sibling — which put
+   the particle field on top of the evidence bars and the closing headline. */
+.showcase__scene {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.showcase__scene--opening {
+  gap: clamp(10px, 1.04vw, 20px);
+}
+
+.showcase__eyebrow {
+  margin: 0;
+  font-size: clamp(12px, 1.04vw, 20px);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--amber-hot);
+}
+
+.showcase__title {
+  margin: 0;
+  font-family: var(--heading);
+  font-weight: 600;
+  font-size: clamp(30px, 3.54vw, 68px);
+  letter-spacing: -0.02em;
+  color: var(--text-h);
+}
+
+/* --- Signals -------------------------------------------------------------- */
+
+.showcase__scene--signals {
+  flex-direction: row;
+  gap: clamp(16px, 2.5vw, 48px);
+  perspective: 1400px;
+}
+
+.showcase__card {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 0.73vw, 14px);
+  width: clamp(190px, 15.63vw, 300px);
+  min-height: clamp(130px, 9.9vw, 190px);
+  padding: clamp(16px, 1.46vw, 28px) clamp(15px, 1.35vw, 26px);
+  text-align: left;
+  background: linear-gradient(160deg, var(--ink-850), var(--ink-800));
+  border: 1px solid var(--ink-600);
+  border-radius: 10px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.showcase__card-rule {
+  width: 34px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--amber-hot);
+}
+
+.showcase__card-name {
+  margin: 0;
+  font-family: var(--heading);
+  font-weight: 600;
+  font-size: clamp(16px, 1.25vw, 24px);
+  line-height: 1.25;
+  color: var(--text-h);
+}
+
+.showcase__card-sub {
+  margin: 0;
+  font-size: clamp(12px, 0.78vw, 15px);
+  line-height: 1.55;
+  color: var(--text);
+}
+
+/* --- Gauge ---------------------------------------------------------------- */
+
+.showcase__scene--gauge {
+  gap: clamp(14px, 1.35vw, 26px);
+  perspective: 1200px;
+}
+
+/* The dial is tilted, and its readout tilts with it — that flattened,
+   instrument-like look is the design, not a side effect. */
+.showcase__dial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(190px, 15.63vw, 300px);
+  height: clamp(190px, 15.63vw, 300px);
+  border-radius: 50%;
+}
+
+.showcase__dial-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  /* 224/300 of the dial, so the ring keeps its weight at every size. */
+  width: 74.67%;
+  height: 74.67%;
+  background: var(--ink-900);
+  border-radius: 50%;
+}
+
+.showcase__percent {
+  font-family: var(--heading);
+  font-weight: 600;
+  font-size: clamp(30px, 2.71vw, 52px);
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.showcase__percent-caption {
+  font-size: clamp(10px, 0.63vw, 12px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.showcase__pill {
+  margin: 0;
+  padding: 7px 18px;
+  font-size: clamp(13px, 0.78vw, 15px);
+  font-weight: 600;
+  color: var(--text-h);
+  background: var(--amber-dim);
+  border: 1px solid var(--amber-line);
+  border-radius: 999px;
+}
+
+.showcase__sentence {
+  margin: 0;
+  max-width: 480px;
+  font-size: clamp(13px, 0.78vw, 15px);
+  line-height: 1.6;
+  color: var(--text);
+}
+
+/* --- Evidence ------------------------------------------------------------- */
+
+.showcase__scene--evidence {
+  gap: clamp(16px, 1.46vw, 28px);
+}
+
+.showcase__evidence-label {
+  margin: 0;
+  font-size: clamp(12px, 0.78vw, 15px);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amber-hot);
+}
+
+.showcase__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(20px, 2.08vw, 40px);
+  height: clamp(120px, 9.38vw, 180px);
+}
+
+.showcase__bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: clamp(56px, 4.69vw, 90px);
+}
+
+.showcase__bar-track {
+  display: flex;
+  align-items: flex-end;
+  width: clamp(26px, 2.08vw, 40px);
+  height: clamp(92px, 7.29vw, 140px);
+  overflow: hidden;
+  background: var(--ink-700);
+  border-radius: 6px;
+}
+
+.showcase__bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, var(--amber-hot), var(--amber));
+  border-radius: 6px;
+}
+
+.showcase__bar-name {
+  margin: 0;
+  font-size: clamp(11px, 0.68vw, 13px);
+  color: var(--text);
+}
+
+/* --- Close ---------------------------------------------------------------- */
+
+.showcase__scene--close {
+  gap: clamp(14px, 1.35vw, 26px);
+  padding: 0 clamp(24px, 4.17vw, 80px);
+}
+
+.showcase__headline {
+  margin: 0;
+  max-width: 900px;
+  font-family: var(--heading);
+  font-weight: 600;
+  font-size: clamp(26px, 2.4vw, 46px);
+  line-height: 1.2;
+  color: var(--text-h);
+}
+
+/* Deliberately not a button: the piece is passive, and the page that hosts it
+   owns the real control. */
+.showcase__cta {
+  padding: 14px 32px;
+  font-size: clamp(13px, 0.83vw, 16px);
+  font-weight: 600;
+  color: var(--ink-900);
+  background: var(--amber-hot);
+  border-radius: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+   Narrow viewports.
+
+   Three 190px cards do not fit on a phone, and a 24s piece has no scroll to
+   fall back on, so the signals scene stacks. Everything else is already
+   proportional.
+--------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .showcase__scene {
+    padding: 0 1.25rem;
+  }
+
+  .showcase__scene--signals {
+    flex-direction: column;
+  }
+
+  .showcase__card {
+    width: min(100%, 340px);
+    min-height: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The static poster.
+
+   When the loop cannot run — reduced motion, a background tab, server
+   rendering — every scene is rendered at its settled time and they are laid
+   out in a column instead of stacked. Same markup, same numbers, no motion:
+   the result is readable without a single frame having been drawn.
+--------------------------------------------------------------------------- */
+
+.showcase.is-static {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(2rem, 5vw, 4rem);
+  min-height: auto;
+  padding: clamp(2rem, 7vw, 5rem) 1.5rem;
+}
+
+/* `relative`, not `static`: it lays out in flow exactly the same way but keeps
+   the z-index above working, so the scenes stay above the decorative layers. */
+.showcase.is-static .showcase__scene {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  padding: 0;
+}
+
+.showcase.is-static .showcase__scene--signals {
+  flex-wrap: wrap;
+}
