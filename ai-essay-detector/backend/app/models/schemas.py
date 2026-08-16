@@ -172,6 +172,21 @@ class HealthResponse(BaseModel):
     model_loaded: bool
 
 
+class RootResponse(BaseModel):
+    """Body of ``GET /``.
+
+    An API-only service still gets opened in a browser, so the root answers
+    with what this process is and where its endpoints live rather than a 404.
+    """
+
+    service: str
+    version: str
+    status: Literal["ok", "degraded"]
+    model_loaded: bool
+    docs: str
+    endpoints: dict[str, str]
+
+
 class ErrorResponse(BaseModel):
     """Uniform error envelope for every non-2xx response."""
 

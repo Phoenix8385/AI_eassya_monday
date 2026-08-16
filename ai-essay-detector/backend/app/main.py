@@ -10,18 +10,23 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.config import get_settings
-from app.models.schemas import ErrorResponse, HealthResponse
+from app.config import BACKEND_ROOT, get_settings
+from app.models.schemas import ErrorResponse, HealthResponse, RootResponse
 from app.routers import analyze as analyze_router
 from app.services import classifier, model_loader
 
 settings = get_settings()
+
+# <repo>/ai-essay-detector/backend -> .../frontend/public/favicon.svg. Resolved
+# once at import: the file either exists in this checkout or it never will.
+_favicon = BACKEND_ROOT.parent / "frontend" / "public" / "favicon.svg"
+FAVICON_PATH = _favicon if _favicon.is_file() else None
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -148,6 +153,43 @@ async def validation_exception_handler(
 
 
 # --- Routes ---------------------------------------------------------------
+@app.get("/", response_model=RootResponse, tags=["ops"])
+async def root() -> RootResponse:
+    """Service index.
+
+    This is an API, not a site, but the root is the first thing anyone types
+    into a browser -- answering with the version, readiness and the endpoint
+    map is more useful than the 404 a missing route would produce.
+    """
+    ready = models_ready()
+    return RootResponse(
+        service=settings.api_title,
+        version=settings.api_version,
+        status="ok" if ready else "degraded",
+        model_loaded=ready,
+        docs="/docs",
+        endpoints={
+            "health": "GET /health",
+            "analyze": "POST /analyze",
+            "docs": "GET /docs",
+            "openapi": "GET /openapi.json",
+        },
+    )
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> Response:
+    """Browsers request this unprompted on every root visit.
+
+    The frontend ships the real icon; the API serves it too when that build is
+    checked out beside the backend, and answers 204 otherwise so an unrelated
+    request never shows up as an error in the log.
+    """
+    if FAVICON_PATH is not None:
+        return FileResponse(FAVICON_PATH, media_type="image/svg+xml")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.get("/health", response_model=HealthResponse, tags=["ops"])
 async def health() -> HealthResponse:
     """Liveness plus a real readiness signal.
